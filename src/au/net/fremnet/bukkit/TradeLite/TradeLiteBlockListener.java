@@ -36,7 +36,9 @@ public class TradeLiteBlockListener extends BlockListener {
 		if (line0.equalsIgnoreCase("[trade]")) {
 			TradePost tradePost = TradePost.init(event.getBlock());
 			if (tradePost != null) {
-				tradePost.setup(event.getPlayer());
+				if (!tradePost.setup(event)) {
+					event.setCancelled(true);
+				}
 			}
 		}
 	}

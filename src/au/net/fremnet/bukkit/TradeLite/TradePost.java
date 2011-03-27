@@ -28,6 +28,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
+import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -39,11 +40,11 @@ public class TradePost {
 	
 	private Material tradingFrom;
 	private Integer tradingFromQty;
-	private Integer tradingFromStock;
+	private Integer tradingFromStock = 0;
 
 	private Material tradingTo;
 	private Integer tradingToQty;
-	private Integer tradingToStock;
+	private Integer tradingToStock = 0;
 
 	// TODO come back and make the material:x work
 	// static private Pattern tradeExpression = Pattern.compile("^(\\d+) ?x ?(\\d+(?::\\d*)?)\t(\\d+) ?x ?(\\d+(?::\\d*)?)$");
@@ -62,7 +63,7 @@ public class TradePost {
 		Block chest = tradeSign.getFace(BlockFace.DOWN);
 		Block inventorySign = chest.getFace(signData.getAttachedFace());
 		
-		if (chest.getType().equals(Material.CHEST) && inventorySign.getType().equals(Material.WALL_SIGN)) {
+		if (chest.getType().equals(Material.CHEST) && inventorySign.getType().equals(Material.SIGN_POST)) {
 			return new TradePost(tradeSign, chest, inventorySign);
 		}
 
@@ -77,6 +78,10 @@ public class TradePost {
 	public void readTradeSign() throws InvalidTradeSignException {
 		Sign signState = (Sign) this.getTradeSign().getState();
 		String tradingLines = signState.getLine(1) + "\t" + signState.getLine(3);
+		this.parseTradeSign(tradingLines);
+	}
+		
+	public void parseTradeSign(String tradingLines) throws InvalidTradeSignException {
 		Matcher m = tradeExpression.matcher(tradingLines);
 		if (!m.matches())
 			throw new InvalidTradeSignException();
@@ -89,14 +94,14 @@ public class TradePost {
 	}
 
 	public void readInventorySign() {
-		Sign signState = (Sign) this.getTradeSign().getState();
+		Sign signState = (Sign) this.getInventorySign().getState();
 		this.setTradingFromStock(Integer.parseInt(signState.getLine(0)));
 		this.setTradingToStock(Integer.parseInt(signState.getLine(1)));
 		this.setOwner(signState.getLine(3));
 	}
 
 	public void updateStock(Integer fromDelta, Integer toDelta) {
-		Sign signState = (Sign) this.getTradeSign().getState();
+		Sign signState = (Sign) this.getInventorySign().getState();
 
 		this.tradingFromStock += fromDelta;
 		this.tradingToStock += toDelta;
@@ -107,9 +112,13 @@ public class TradePost {
 		signState.update();
 	}
 	
-	public Boolean setup(Player player) {
+	public Boolean setup(SignChangeEvent event) {
+		return this.setup(event.getPlayer(), event.getLine(1), event.getLine(3));
+	}
+	
+	public Boolean setup(Player player, String line1, String line3) {
 		try {
-			this.readTradeSign();
+			this.parseTradeSign(line1 + "\t" + line3);
 		}
 		catch (InvalidTradeSignException e) {
 			player.sendMessage("Unable to parse trade sign");
@@ -135,9 +144,21 @@ public class TradePost {
 	}
 	
 	public Boolean isChestEmpty() {
-		return this.getInventory().getContents().length == 0;
+		for (ItemStack itemStack : this.getInventory().getContents()) {
+			if (itemStack.getAmount() != 0)
+				return false; 
+		}
+		return true;
 	}
 	
+	public Integer chestCountItems() {
+		Integer count = 0;
+		for (ItemStack itemStack : this.getInventory().getContents()) {
+			count += itemStack.getAmount();
+		}
+		return count;
+	}
+
 	public Integer chestStockCount(Material material) {
 		Integer count = 0;
 		HashMap<Integer, ? extends ItemStack> stacks = this.getInventory().all(material);
@@ -150,9 +171,11 @@ public class TradePost {
 	public Boolean isTradingFrom() {
 		Inventory inv = this.getInventory();
 		Material from = this.getTradingFrom();
+
+		// TODO one of these checks is failing when there's two+ stacks
 		
 		Boolean sane = inv.contains(from, this.getTradingFromQty());
-		sane &= inv.all(from).size() == inv.getContents().length;
+		sane &= this.chestStockCount(from) == this.chestCountItems();
 		
 		return sane;
 	}
@@ -162,8 +185,7 @@ public class TradePost {
 		Material to = this.getTradingTo();
 		
 		Boolean sane = inv.contains(to, this.getTradingFromQty());
-		sane &= inv.all(to).size() == inv.getContents().length;
-		
+		sane &= this.chestStockCount(to) == this.chestCountItems();
 		return sane;
 	}
 	

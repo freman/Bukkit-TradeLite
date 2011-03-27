@@ -39,15 +39,21 @@ public class TradeLitePlayerListener extends PlayerListener {
 	@Override
     public void onPlayerInteract(PlayerInteractEvent event) {
 		if (!event.hasBlock()) return;
-		
 		if (event.getAction().equals(Action.RIGHT_CLICK_BLOCK)) {
 			Block block = event.getClickedBlock();
 			if (block.getType().equals(Material.WALL_SIGN)) {
 				Sign sign = (Sign)block.getState();
 				if (sign.getLine(0).equalsIgnoreCase("[trade]")) {
 					TradePost tradePost = TradePost.init(block);
-					if (tradePost != null)
-						trade(event.getPlayer(), tradePost);
+					if (tradePost != null) {
+						try {
+							tradePost.readSigns();
+							trade(event.getPlayer(), tradePost);
+						}
+						catch (InvalidTradeSignException e) {
+							e.printStackTrace();
+						}
+					}
 				}
 			}
 		}
@@ -84,30 +90,35 @@ public class TradeLitePlayerListener extends PlayerListener {
 				transfer = tradePost.getTradingFrom();
 			}
 			
-			Integer maxQty = transfer.getMaxStackSize() * 27;
-			if (qty > maxQty) {
-				remaining = maxQty - qty;
-				qty = maxQty;
-			}
-
-			tradePost.getInventory().addItem(new ItemStack(transfer, qty));
-			if (tradingTo) {
-				tradePost.updateStock(0, -qty);
+			if (qty == 0) {
+				player.sendMessage("There is no more stock to remove");
 			}
 			else {
-				tradePost.updateStock(-qty, 0);
-			}
-			
-			if (remaining > 0) {
-				player.sendMessage(String.format("Removed %d x %s from stock, %d remains in stock", qty, transfer.name(), remaining));
-			}
-			else {
-				player.sendMessage(String.format("Removed %d x %s from stock", qty, transfer.name()));
+				Integer maxQty = transfer.getMaxStackSize() * 27;
+				if (qty > maxQty) {
+					remaining = maxQty - qty;
+					qty = maxQty;
+				}
+	
+				tradePost.getInventory().addItem(new ItemStack(transfer, qty));
+				if (tradingTo) {
+					tradePost.updateStock(0, -qty);
+				}
+				else {
+					tradePost.updateStock(-qty, 0);
+				}
+				
+				if (remaining > 0) {
+					player.sendMessage(String.format("Removed %d x %s from stock, %d remains in stock", qty, transfer.name(), remaining));
+				}
+				else {
+					player.sendMessage(String.format("Removed %d x %s from stock", qty, transfer.name()));
+				}
 			}
 		}
 		else {
-			player.sendMessage(String.format("You will recieve %d x %s", tradePost.getTradingFromQty(), tradePost.getTradingFrom().name()));
-			player.sendMessage(String.format("in exchange for %d x %s", tradePost.getTradingToQty(), tradePost.getTradingTo().name()));
+			player.sendMessage(String.format("You will recieve %d x %s", tradePost.getTradingToQty(), tradePost.getTradingTo().name()));
+			player.sendMessage(String.format("in exchange for %d x %s", tradePost.getTradingFromQty(), tradePost.getTradingFrom().name()));
 			player.sendMessage(String.format("There is currently %d x %s in stock", tradePost.getTradingToStock(), tradePost.getTradingTo().name()));
 		}
 	}
