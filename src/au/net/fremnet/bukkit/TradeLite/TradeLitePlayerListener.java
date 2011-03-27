@@ -60,6 +60,7 @@ public class TradeLitePlayerListener extends PlayerListener {
     }
 	
 	private void trade(Player player, TradePost tradePost) {
+		tradePost.updateChestContents();
 		if (tradePost.isChestEmpty()) {
 			tradeEmpty(player, tradePost);
 		}
@@ -131,7 +132,7 @@ public class TradeLitePlayerListener extends PlayerListener {
 			// TODO check that the chest can hold the trade
 			Integer fromOffer = tradePost.chestStockCount(tradePost.getTradingFrom());
 			Integer fromRemainder = fromOffer %	tradePost.getTradingFromQty();
-			Integer toOffer = (fromOffer - fromRemainder) / tradePost.getTradingFromQty();
+			Integer toOffer = ((fromOffer - fromRemainder) / tradePost.getTradingFromQty()) * tradePost.getTradingToQty();
 			if (toOffer > tradePost.getTradingToStock()) {
 				player.sendMessage(String.format("There is insufficient stock of %s", tradePost.getTradingTo().name()));
 			}

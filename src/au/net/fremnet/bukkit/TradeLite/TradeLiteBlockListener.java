@@ -39,6 +39,10 @@ public class TradeLiteBlockListener extends BlockListener {
 				if (!tradePost.setup(event)) {
 					event.setCancelled(true);
 				}
+				else {
+					event.setLine(0, "[TRADE]");
+					event.setLine(2, "for");
+				}
 			}
 		}
 	}

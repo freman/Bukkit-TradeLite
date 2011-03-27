@@ -46,6 +46,9 @@ public class TradePost {
 	private Integer tradingToQty;
 	private Integer tradingToStock = 0;
 
+	private HashMap<Material, Integer> chestContents = new HashMap<Material, Integer>();
+	private Integer chestContentsCount = 0;
+	
 	// TODO come back and make the material:x work
 	// static private Pattern tradeExpression = Pattern.compile("^(\\d+) ?x ?(\\d+(?::\\d*)?)\t(\\d+) ?x ?(\\d+(?::\\d*)?)$");
 	static private Pattern tradeExpression = Pattern.compile("^(\\d+) ?x ?(\\d+)\t(\\d+) ?x ?(\\d+)$");
@@ -143,49 +146,49 @@ public class TradePost {
 		return chest.getInventory();
 	}
 	
-	public Boolean isChestEmpty() {
+	public void updateChestContents() {
+		this.chestContents.clear();
+		this.chestContentsCount = 0;
+		
 		for (ItemStack itemStack : this.getInventory().getContents()) {
-			if (itemStack.getAmount() != 0)
-				return false; 
+			if (itemStack.getAmount() != 0) {
+				Integer amount = itemStack.getAmount();
+				Material type = itemStack.getType();
+				if (this.chestContents.containsKey(type)) {
+					this.chestContents.put(type, this.chestContents.get(type) + amount);
+				}
+				else {
+					this.chestContents.put(type, amount);
+				}
+				this.chestContentsCount += amount;
+			}
 		}
-		return true;
+		
+	}
+	
+	public Boolean isChestEmpty() {
+		return this.chestContentsCount == 0;
 	}
 	
 	public Integer chestCountItems() {
-		Integer count = 0;
-		for (ItemStack itemStack : this.getInventory().getContents()) {
-			count += itemStack.getAmount();
-		}
-		return count;
+		return this.chestContentsCount;
 	}
 
 	public Integer chestStockCount(Material material) {
-		Integer count = 0;
-		HashMap<Integer, ? extends ItemStack> stacks = this.getInventory().all(material);
-		for (ItemStack stack : stacks.values()) {
-			count += stack.getAmount();
-		}
-		return count;
+		return this.chestContents.containsKey(material) ? this.chestContents.get(material) : 0; 
 	}
 	
 	public Boolean isTradingFrom() {
-		Inventory inv = this.getInventory();
-		Material from = this.getTradingFrom();
-
-		// TODO one of these checks is failing when there's two+ stacks
-		
-		Boolean sane = inv.contains(from, this.getTradingFromQty());
-		sane &= this.chestStockCount(from) == this.chestCountItems();
-		
-		return sane;
+		return this.tradeSanity(this.getTradingFrom(), this.getTradingFromQty());
 	}
 
 	public Boolean isTradingTo() {
-		Inventory inv = this.getInventory();
-		Material to = this.getTradingTo();
-		
-		Boolean sane = inv.contains(to, this.getTradingFromQty());
-		sane &= this.chestStockCount(to) == this.chestCountItems();
+		return this.tradeSanity(this.getTradingTo(), this.getTradingToQty());
+	}
+
+	private Boolean tradeSanity(Material which, Integer qty) {
+		Boolean sane = this.chestStockCount(which) >= qty;
+		sane &= this.chestContents.size() == 1;
 		return sane;
 	}
 	
